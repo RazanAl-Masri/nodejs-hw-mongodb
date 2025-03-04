@@ -2,7 +2,7 @@ import { SORT_ORDER } from '../constants/index.js';
 import { Contact } from '../models/contacts.js';
 
 /**
- * Fetch paginated contacts with sorting
+ * Fetch paginated contacts with sorting.
  * @param {Object} params - Query parameters
  * @param {number} params.page - Current page number
  * @param {number} params.perPage - Items per page
@@ -12,34 +12,28 @@ import { Contact } from '../models/contacts.js';
  */
 export const getAllContacts = async ({ page = 1, perPage = 10, sortOrder = SORT_ORDER.ASC, sortBy = '_id' }) => {
     try {
-        // Convert page and perPage to numbers
-        page = Math.max(Number(page), 1);
-        perPage = Math.max(Number(perPage), 1);
+        // Ensure page and perPage are positive integers
+        page = Math.max(Number(page) || 1, 1);
+        perPage = Math.max(Number(perPage) || 10, 1);
 
-        // Calculate skip value for pagination
+        // Calculate pagination values
         const skip = (page - 1) * perPage;
-
-        // Get total count of contacts
         const totalItems = await Contact.countDocuments();
 
         // Fetch paginated contacts with sorting
         const contacts = await Contact.find()
             .sort({ [sortBy]: sortOrder === SORT_ORDER.DESC ? -1 : 1 })
             .skip(skip)
-            .limit(perPage)
-            .exec();
-
-        // Calculate total pages
-        const totalPages = Math.ceil(totalItems / perPage);
+            .limit(perPage);
 
         return {
-            data: contacts,
+            contacts,
             page,
             perPage,
             totalItems,
-            totalPages,
+            totalPages: Math.ceil(totalItems / perPage),
             hasPreviousPage: page > 1,
-            hasNextPage: page < totalPages,
+            hasNextPage: page * perPage < totalItems,
         };
     } catch (error) {
         console.error('Error fetching contacts:', error);
@@ -48,13 +42,14 @@ export const getAllContacts = async ({ page = 1, perPage = 10, sortOrder = SORT_
 };
 
 /**
- * Fetch a single contact by ID
+ * Fetch a single contact by ID.
  * @param {string} id - Contact ID
  * @returns {Object|null} Contact object or null if not found
  */
 export const getContactById = async (id) => {
     try {
-        return await Contact.findById(id);
+        const contact = await Contact.findById(id);
+        return contact || null;
     } catch (error) {
         console.error(`Error fetching contact with ID ${id}:`, error);
         return null;
@@ -62,7 +57,7 @@ export const getContactById = async (id) => {
 };
 
 /**
- * Create a new contact
+ * Create a new contact.
  * @param {Object} payload - Contact data
  * @returns {Object} Created contact
  */
@@ -76,13 +71,14 @@ export const createContact = async (payload) => {
 };
 
 /**
- * Delete a contact by ID
+ * Delete a contact by ID.
  * @param {string} id - Contact ID
  * @returns {Object|null} Deleted contact or null if not found
  */
 export const deleteContact = async (id) => {
     try {
-        return await Contact.findByIdAndDelete(id);
+        const deletedContact = await Contact.findByIdAndDelete(id);
+        return deletedContact || null;
     } catch (error) {
         console.error(`Error deleting contact with ID ${id}:`, error);
         return null;
@@ -90,7 +86,7 @@ export const deleteContact = async (id) => {
 };
 
 /**
- * Update or upsert a contact
+ * Update or upsert a contact.
  * @param {string} id - Contact ID
  * @param {Object} payload - Contact data to update
  * @param {Object} options - Additional options (e.g., upsert)
