@@ -1,57 +1,97 @@
 import { SORT_ORDER } from '../constants/index.js';
 import { Contact } from '../models/contacts.js';
 import { calculatePaginationData } from '../utils/calculatePaginationData.js';
+
 export const getAllContacts = async ({
   page = 1,
   perPage = 10,
   sortOrder = SORT_ORDER.ASC,
   sortBy = '_id',
 }) => {
-  const limit = perPage;
-  const skip = (page - 1) * perPage;
-  const contactsQuery = Contact.find();
-  const [contactsCount, contacts] = await Promise.all([
-    Contact.find().merge(contactsQuery).countDocuments(),
-    contactsQuery
-      .skip(skip)
-      .limit(limit)
-      .sort({ [sortBy]: sortOrder })
-      .exec(),
-  ]);
-  const paginationData = calculatePaginationData(contactsCount, perPage, page);
+  try {
+    // Convert page and perPage to numbers
+    page = Number(page);
+    perPage = Number(perPage);
+    
+    if (isNaN(page) || page < 1) page = 1;
+    if (isNaN(perPage) || perPage < 1) perPage = 10;
 
-  console.log('succesfully fetched');
-  return {
-    data: contacts,
-    ...paginationData,
-  };
+    // Calculate skip value for pagination
+    const skip = (page - 1) * perPage;
+
+    // Count total contacts
+    const totalItems = await Contact.countDocuments();
+
+    // Fetch paginated contacts with sorting
+    const contacts = await Contact.find()
+      .sort({ [sortBy]: sortOrder === SORT_ORDER.DESC ? -1 : 1 })
+      .skip(skip)
+      .limit(perPage)
+      .exec();
+
+    // Calculate pagination metadata
+    const paginationData = calculatePaginationData(totalItems, perPage, page);
+
+    console.log('Successfully fetched paginated contacts');
+
+    return {
+      data: contacts,
+      page,
+      perPage,
+      totalItems,
+      totalPages: paginationData.totalPages,
+      hasPreviousPage: paginationData.hasPreviousPage,
+      hasNextPage: paginationData.hasNextPage,
+    };
+  } catch (error) {
+    console.error('Error fetching contacts:', error);
+    throw new Error('Error retrieving contacts');
+  }
 };
 
 export const getContactById = async (id) => {
-  const contact = await Contact.findById(id);
-  return contact;
+  try {
+    return await Contact.findById(id);
+  } catch (error) {
+    console.error(`Error fetching contact with ID ${id}:`, error);
+    return null;
+  }
 };
 
 export const createContact = async (payload) => {
-  const contact = await Contact.create(payload);
-  return contact;
+  try {
+    return await Contact.create(payload);
+  } catch (error) {
+    console.error('Error creating contact:', error);
+    throw new Error('Failed to create contact');
+  }
 };
 
 export const deleteContact = async (id) => {
-  const contact = await Contact.findByIdAndDelete({
-    _id: id,
-  });
-  return contact;
+  try {
+    return await Contact.findByIdAndDelete({ _id: id });
+  } catch (error) {
+    console.error(`Error deleting contact with ID ${id}:`, error);
+    return null;
+  }
 };
+
 export const updateContact = async (id, payload, options = {}) => {
-  const rawResult = await Contact.findByIdAndUpdate({ _id: id }, payload, {
-    new: true,
-    includeResultMetadata: true,
-    ...options,
-  });
-  if (!rawResult || !rawResult.value) return null;
-  return {
-    student: rawResult.value,
-    isNew: Boolean(rawResult?.lastErrorObject?.upserted),
-  };
+  try {
+    const rawResult = await Contact.findByIdAndUpdate({ _id: id }, payload, {
+      new: true,
+      includeResultMetadata: true,
+      ...options,
+    });
+
+    if (!rawResult) return null;
+
+    return {
+      contact: rawResult, // Fixed incorrect key from 'student' to 'contact'
+      isNew: Boolean(rawResult?.lastErrorObject?.upserted),
+    };
+  } catch (error) {
+    console.error(`Error updating contact with ID ${id}:`, error);
+    return null;
+  }
 };
